@@ -6,12 +6,16 @@ from torch.nn import Parameter
 
 class Pruner(object):
     masks = {}
-    _variables = ['weight']
+
+    _variables = ['rnn.weight', 'rnn.layer']
+    _exclude_variables = ['embedding']
+
 
     def _check_name(self, name):
         for v_partial in self._variables:
-            if v_partial in name:
-                return True
+            for nv_partial in self._exclude_variables:
+                if v_partial in name and not nv_partial in name:
+                    return True
         return False
 
     def __init__(self, load_mask=None, device='cpu', save_mask='mask.pkl', prune_params={'alpha':0.5}):

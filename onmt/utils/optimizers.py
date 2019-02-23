@@ -85,6 +85,8 @@ def build_torch_optimizer(model, opt):
     else:
         raise ValueError('Invalid optimizer type: ' + opt.optim)
 
+    if not hasattr(opt, 'model_dtype'):
+        return optimizer
     if opt.model_dtype == 'fp16':
         import apex
         static_loss_scale = opt.loss_scale
@@ -111,7 +113,7 @@ def make_learning_rate_decay_fn(opt):
     elif opt.decay_method == 'rsqrt':
         return functools.partial(
             rsqrt_decay, warmup_steps=opt.warmup_steps)
-    elif opt.start_decay_steps is not None:
+    elif hasattr(opt, 'start_decay_steps') and opt.start_decay_steps is not None:
         return functools.partial(
             exponential_decay,
             rate=opt.learning_rate_decay,

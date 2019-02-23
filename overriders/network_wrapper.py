@@ -18,12 +18,14 @@ def rsetattr(obj, attr, val):
 
 class NetworkWrapperBase(object):
 
-    _variables = ['weight']
+    _variables = ['rnn.weight', 'rnn.layer']
+    _exclude_variables = ['embedding']
 
     def _check_name(self, name):
         for v_partial in self._variables:
-            if v_partial in name:
-                return True
+            for nv_partial in self._exclude_variables:
+                if v_partial in name and not nv_partial in name:
+                    return True
         return False
 
     def _override(self, update=False):
@@ -31,12 +33,13 @@ class NetworkWrapperBase(object):
         quantizer = self.transformer.get('quantizer', None)
 
         if update:
-          self.pruner.update_masks(self.named_parameters())
+          pruner.update_masks(self.named_parameters())
 
         # pruner
         for name, param in self.named_parameters():
-            if self._check_name(name):
-              mask = self.pruner.get_mask(param.data, name)
+            if self._check_name(name) and param.data.is_cuda:
+              mask = pruner.get_mask(param.data, name)
+              mask = mask.to(param.data.device)
               rsetattr(self, name + '.data', param.data.mul_(mask))
 
 # def override(model, transformer, update=False):

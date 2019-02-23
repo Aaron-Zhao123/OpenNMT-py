@@ -18,6 +18,7 @@ from onmt.modules.util_class import Cast
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
+from overriders.pruner import Pruner
 
 
 def build_embeddings(opt, text_field, for_encoder=True):
@@ -153,8 +154,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         device = torch.device("cuda")
     elif not gpu:
         device = torch.device("cpu")
-
     if model_opt.prune:
+        transformer = {}
         prune_params = {'alpha': model_opt.prune_alpha}
         pruner = Pruner(
             device=device,
