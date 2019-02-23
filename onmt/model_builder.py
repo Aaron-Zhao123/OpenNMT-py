@@ -153,7 +153,18 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         device = torch.device("cuda")
     elif not gpu:
         device = torch.device("cpu")
-    model = onmt.models.NMTModel(encoder, decoder)
+
+    if model_opt.prune:
+        prune_params = {'alpha': model_opt.prune_alpha}
+        pruner = Pruner(
+            device=device,
+            load_mask=model_opt.load_mask,
+            prune_params=prune_params)
+        transformer['pruner'] = pruner
+        model = onmt.models.NetworkWrapper(
+            encoder, decoder, transformer=transformer)
+    else:
+        model = onmt.models.NMTModel(encoder, decoder)
 
     # Build Generator.
     if not model_opt.copy_attn:
