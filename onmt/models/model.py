@@ -1,5 +1,6 @@
 """ Onmt NMT Model base class definition """
 import torch.nn as nn
+from overriders.network_wrapper import NetworkWrapperBase
 
 
 class NMTModel(nn.Module):
@@ -45,3 +46,14 @@ class NMTModel(nn.Module):
         dec_out, attns = self.decoder(tgt, memory_bank,
                                       memory_lengths=lengths)
         return dec_out, attns
+
+
+class NetworkWrapper(NMTModel, NetworkWrapperBase):
+    def __init__(self, *args, **kwargs):
+        self.transformer = kwargs.pop('transformer')
+        super(NetworkWrapper, self).__init__(*args, **kwargs)
+        self._override(update=True)
+
+    def forward(self, *args, **kwargs):
+        self._override(update=False)
+        return super(NetworkWrapper, self).forward(*args, **kwargs)

@@ -180,6 +180,16 @@ def model_opts(parser):
               help="For FP16 training, the static loss scale to use. If not "
                    "set, the loss scale is dynamically computed.")
 
+    group = parser.add_argument_group('Overriders')
+    group.add(
+        '--prune', action='store_true',
+        help='Determines whether to apply pruner.')
+    group.add(
+        '--prune_alpha', type=float, default=0.1,
+        help='Pruner Threshold value.')
+    group.add(
+        '--load_mask', type=str, default=None,
+        help='mask loading path.')
 
 def preprocess_opts(parser):
     """ Pre-procesing options """
