@@ -55,6 +55,11 @@ def main(opt, device_id):
         ArgumentParser.validate_model_opts(model_opt)
         logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
         vocab = checkpoint['vocab']
+
+        # force to import opt
+        model_opt.prune = opt.prune
+        model_opt.prune_alpha = opt.prune_alpha
+        model_opt.load_mask = opt.load_mask
     else:
         checkpoint = None
         model_opt = opt
