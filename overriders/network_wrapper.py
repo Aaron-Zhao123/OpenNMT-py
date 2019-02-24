@@ -28,7 +28,7 @@ class NetworkWrapperBase(object):
                     return True
         return False
 
-    def _override(self, update=False, test=True):
+    def _override(self, update=False, test=True, prune_update=True, quantize_update=True):
         pruner = self.transformer.get('pruner', None)
         quantizer = self.transformer.get('quantizer', None)
 
@@ -37,9 +37,9 @@ class NetworkWrapperBase(object):
             self.overriden = {}
 
         if update:
-            if pruner is not None:
+            if pruner is not None and prune_update:
                 pruner.update_masks(self.named_parameters())
-            if quantizer is not None:
+            if quantizer is not None and quantize_update:
                 quantizer.update_quantizers(self.named_parameters(), pruner.masks)
 
         # pruner
