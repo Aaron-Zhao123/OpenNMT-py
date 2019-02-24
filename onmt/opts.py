@@ -190,10 +190,9 @@ def model_opts(parser):
     group.add(
         '--load_mask', '-load_mask', type=str, default=None,
         help='mask loading path.')
-
     group.add(
         '--quantize', '-quantize', type=int, default=0,
-        help='Determines whether to apply a quantizer.')
+        help='Determines whether to apply pruner.')
     group.add(
         '--quantize_width', '-quantize_width', type=int, default=4,
         help='Quantization width.')

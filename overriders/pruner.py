@@ -10,7 +10,6 @@ class Pruner(object):
     _variables = ['rnn.weight', 'rnn.layer', 'embedding', 'attn']
     _exclude_variables = ['dummy']
 
-    _variables = ['weight']
 
     def _check_name(self, name):
         for v_partial in self._variables:
@@ -100,7 +99,4 @@ class Pruner(object):
     def _save_masks(self, fname):
         with open(fname, 'wb') as f:
             pickle.dump(self.masks, f)
-
-
-
 

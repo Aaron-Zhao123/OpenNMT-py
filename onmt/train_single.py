@@ -60,6 +60,11 @@ def main(opt, device_id):
         model_opt.prune = opt.prune
         model_opt.prune_alpha = opt.prune_alpha
         model_opt.load_mask = opt.load_mask
+
+        model_opt.quantize = opt.quantize
+        model_opt.quantize_width = opt.quantize_width
+        model_opt.quantize_distance = opt.quantize_distance
+        model_opt.quantize_interval = opt.quantize_interval
     else:
         checkpoint = None
         model_opt = opt

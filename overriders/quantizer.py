@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import pickle
 import math
+import gc
 
 from torch.nn import Parameter
 from sklearn.mixture import GaussianMixture
@@ -21,6 +22,9 @@ class Quantizer(object):
     # the quantizer is our customized recentralization quantizer
     masks = {}
     _variables = ['weight']
+    _variables = ['rnn.weight', 'rnn.layer', 'attn']
+    _exclude_variables = ['dummy']
+
 
     def _check_name(self, name):
         for v_partial in self._variables:
@@ -43,7 +47,7 @@ class Quantizer(object):
         self.masks = {}
         self.quan = {}
         self.epsilon = epsolon
-        self.trainable_scale = Parameter(torch.Tensor(1.0), requires_grad=True)
+        self.trainable_scale = Parameter(torch.Tensor([1.0]), requires_grad=True)
         super(Quantizer).__init__()
 
     def forward_pass(self, name, value):
@@ -102,12 +106,18 @@ class Quantizer(object):
         return value + qerror
 
     def update_quantizers(self, named_params, pruner_masks=None):
+        names = []
         for n, p in named_params:
             if self._check_name(n):
                 if p.is_cuda:
                     p = p.cpu()
                 p = p.detach().numpy()
-                mask = pruner_masks[n+'.mask'].detach().numpy().astype(np.int)
+                mask = pruner_masks[n+'.mask']
+                if mask.is_cuda:
+                    mask = mask.cpu()
+                mask = mask.detach().numpy().astype(np.int)
+                print(n)
+                gc.collect()
                 mode, width, pmean, nmean, pstd, nstd, pmask, nmask, zmask = self.mle_update(n, p, mask)
                 nzmask = np.logical_not(nmask)
                 value = p
@@ -124,16 +134,21 @@ class Quantizer(object):
                 self.gmm_stats[n] = (pmean, pstd, nmean, nstd)
                 self.masks[n] = (pmask, nmask, zmask, nzmask)
                 self.quan[n] = (mode, width, bias)
+<<<<<<< HEAD
         self._save_meta(self.save_meta)
+=======
+                names.append(n)
+        print('[QUANTIZE!] {} are quantized with {} bitwidth using MLE'.format(names, self.width))
+>>>>>>> refs/remotes/origin/master
 
 
     def _shift_update(self, value, width):
         max_exponent = np.ceil(np.log2(np.max(np.abs(value))))
         return 2 ** width - max_exponent
 
-    def mle_update(self, name, value, nzmask=None):
+    def mle_update(self, name, value, nzmask=None, plot=False):
         if nzmask is None:
-            nzmask = value != 0
+            nzmask = (value != 0)
 
         mixture = BimodalGaussian(name, value[nzmask], 0.0)
         pmean, nmean = mixture.pmean, mixture.nmean
@@ -158,10 +173,12 @@ class Quantizer(object):
         else:
             width = self.width
             mode = 'seperate'
-        pmask = mixture.predict1(value, True)
-        pmask = np.logical_and(pmask, nzmask)
-        nmask = np.logical_and(np.logical_not(pmask), nzmask)
-        zmask = np.logical_not(nzmask)
+        pmask = np.logical_and(mixture.predict1(value, True), nzmask).astype(np.uint8)
+        nmask = np.logical_and(np.logical_not(pmask), nzmask).astype(np.uint8)
+        zmask = np.logical_not(nzmask).astype(np.int).astype(np.uint8)
+        if plot:
+            mixture.plot()
+        gc.collect()
         return (mode, width, pmean, nmean, pstd, nstd, pmask, nmask, zmask)
 
     def get_mask(self, value, name):
@@ -193,6 +210,7 @@ class BimodalGaussian(GaussianMixture):
         self.bound = bound
         self.data = data
         self._fit()
+        gc.collect()
 
     @staticmethod
     def _overflow(data, orate):
