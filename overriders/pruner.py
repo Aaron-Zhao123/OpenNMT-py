@@ -78,7 +78,24 @@ class Pruner(object):
     def _load_masks(self, fname):
         with open(fname, 'rb') as f:
             self.masks = pickle.load(f)
+        import pdb; pdb.set_trace()
         print("Loaded mask from {}".format(fname))
+
+
+    def exportable_data(self, named_params):
+        mask_and_data = {}
+        for n, p in named_params:
+            if self._check_name(n):
+                existing_mask = self.get_mask(p, n)
+                if existing_mask.is_cuda:
+                    existing_mask = existing_mask.cpu()
+                em = existing_mask.detach().numpy()
+                if p.is_cuda:
+                    p = p.cpu()
+                p = p.detach().numpy()
+            mask_and_data[n] = (em, p)
+        with open("export_data.pkl", "wb") as f:
+            pickle.dump(mask_and_data, f)
 
     def _save_masks(self, fname):
         with open(fname, 'wb') as f:

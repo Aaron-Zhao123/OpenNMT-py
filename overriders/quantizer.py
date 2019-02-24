@@ -124,6 +124,7 @@ class Quantizer(object):
                 self.gmm_stats[n] = (pmean, pstd, nmean, nstd)
                 self.masks[n] = (pmask, nmask, zmask, nzmask)
                 self.quan[n] = (mode, width, bias)
+        self._save_meta(self.save_meta)
 
 
     def _shift_update(self, value, width):
@@ -172,12 +173,12 @@ class Quantizer(object):
 
     def _load_meta(self, fname):
         with open(fname, 'rb') as f:
-            self.masks,  = pickle.load(f)
+            self.gmm_stats, self.masks, self.quan  = pickle.load(f)
         print("Loaded mask from {}".format(fname))
 
-    def _save_masks(self, fname):
+    def _save_meta(self, fname):
         with open(fname, 'wb') as f:
-            pickle.dump(self.masks, f)
+            pickle.dump((self.gmm_stats, self.masks, self.quan), f)
 
 
 class BimodalGaussian(GaussianMixture):
