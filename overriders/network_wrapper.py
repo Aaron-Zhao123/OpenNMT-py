@@ -18,9 +18,8 @@ def rsetattr(obj, attr, val):
 
 class NetworkWrapperBase(object):
 
-    _variables = ['rnn.weight', 'rnn.layer']
-    _variables = ['weight']
-    _exclude_variables = ['embedding']
+    _variables = ['rnn.weight', 'rnn.layer', 'embedding', 'attn']
+    _exclude_variables = ['dummy']
 
     def _check_name(self, name):
         for v_partial in self._variables:
