@@ -34,7 +34,7 @@ class Quantizer(object):
 
     def __init__(
             self, load_meta=None, device='cpu', save_meta='quantize.pkl', epsolon=1e-4,
-            quantize_params={'width': 4, 'distance': 2.5, 'percentage': 0.25}):
+            quantize_params={'width': 4, 'distance': 2.5, 'percentage': 0.25, 'load': None}):
         if load_meta is not None:
             self._load_meta(load_mask)
         self.quantize = quantize_params
@@ -43,6 +43,7 @@ class Quantizer(object):
         self.wsep = quantize_params['distance']
         self.width = quantize_params['width']
         self.percentage = quantize_params['percentage']
+        self.load_path = quantize_params['load']
         self.gmm_stats = {}
         self.masks = {}
         self.quan = {}
@@ -107,6 +108,24 @@ class Quantizer(object):
         return value + qerror
 
     def update_quantizers(self, named_params, pruner_masks=None):
+        if self.load_path is not None:
+            self._load_meta(self.load_path)
+            print("[QUATNIZE] Loade meta from ", self.load_path)
+            for n, p in named_params:
+                mode, width, bias = self.quan[name]
+                pmean, pstd, nmean, nstd = self.gmm_stats[name]
+                pmask, nmask, zmask, nzmask = self.masks[name]
+                nzmask = np.logical_not(nmask)
+                value = p
+                if mode == 'seperate':
+                    pmean = self.shift_quantize(pmean, 2*width, width, bypass_clip=True)
+                    nmean = self.shift_quantize(nmean, 2*width, width, bypass_clip=True)
+                    value = value * pmask - pmean + value * nmask - nmean
+                    value *= nzmask
+                threshold = np.percentile(np.abs(value[nzmask]), self.percentage * 100)
+                self.interval_mask[n] = np.abs(value) > threshold
+                self.interval_mask[n] = torch.Tensor(self.interval_mask[n].astype(np.int))
+            return
         names = []
         for n, p in named_params:
             if self._check_name(n):

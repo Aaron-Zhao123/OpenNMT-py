@@ -202,6 +202,10 @@ def model_opts(parser):
     group.add(
         '--quantize_interval', '-quantize_interval', type=float, default=0.25,
         help='Incremetnal quantization interval.')
+    group.add(
+        '--quantize_load', '-quantize_load', type=str, default=None,
+        help='Incremetnal quantization interval.')
+
 
 
 

@@ -169,7 +169,9 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
                 quantize_params={
                     'width': model_opt.quantize_width,
                     'distance': model_opt.quantize_distance,
-                    'percentage': model_opt.quantize_interval}
+                    'percentage': model_opt.quantize_interval,
+                    'load': model_opt.quantize_load,
+                    }
             )
             transformer['quantizer'] = quantizer
         model = onmt.models.NetworkWrapper(

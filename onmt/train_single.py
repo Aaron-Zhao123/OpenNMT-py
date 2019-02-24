@@ -65,6 +65,7 @@ def main(opt, device_id):
         model_opt.quantize_width = opt.quantize_width
         model_opt.quantize_distance = opt.quantize_distance
         model_opt.quantize_interval = opt.quantize_interval
+        model_opt.quantize_load = opt.quantize_load
     else:
         checkpoint = None
         model_opt = opt
