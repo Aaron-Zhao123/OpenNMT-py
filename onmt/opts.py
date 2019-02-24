@@ -698,6 +698,13 @@ def translate_opts(parser):
               type=int, default=3, choices=[3, 1],
               help="Using grayscale image can training "
                    "model faster and smaller")
+    group.add(
+        '--load_mask', '-load_mask', type=str, default=None,
+        help='mask loading path.')
+    group.add(
+        '--quantize_load', '-quantize_load', type=str, default=None,
+        help='Incremetnal quantization interval.')
+
 
 
 # Copyright 2016 The Chromium Authors. All rights reserved.

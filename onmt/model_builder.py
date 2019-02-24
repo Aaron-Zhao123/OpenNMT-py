@@ -97,6 +97,9 @@ def load_test_model(opt, model_path=None):
     else:
         fields = vocab
 
+    model_opt.load_mask = opt.load_mask
+    model_opt.quantize_load = opt.quantize_load
+
     model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint,
                              opt.gpu)
     if opt.fp32:
