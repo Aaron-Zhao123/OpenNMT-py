@@ -18,8 +18,8 @@ def rsetattr(obj, attr, val):
 
 class NetworkWrapperBase(object):
 
-    _variables = ['rnn.weight', 'rnn.layer']
-    _exclude_variables = ['embedding']
+    _variables = ['rnn.weight', 'rnn.layer', 'embedding', 'attn']
+    _exclude_variables = ['dummy']
 
     def _check_name(self, name):
         for v_partial in self._variables:
@@ -37,7 +37,8 @@ class NetworkWrapperBase(object):
 
         # pruner
         for name, param in self.named_parameters():
-            if self._check_name(name) and param.data.is_cuda:
+            #if self._check_name(name) and param.data.is_cuda:
+            if self._check_name(name):
               mask = pruner.get_mask(param.data, name)
               mask = mask.to(param.data.device)
               rsetattr(self, name + '.data', param.data.mul_(mask))

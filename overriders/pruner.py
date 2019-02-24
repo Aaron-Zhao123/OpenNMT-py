@@ -7,8 +7,8 @@ from torch.nn import Parameter
 class Pruner(object):
     masks = {}
 
-    _variables = ['rnn.weight', 'rnn.layer']
-    _exclude_variables = ['embedding']
+    _variables = ['rnn.weight', 'rnn.layer', 'embedding', 'attn']
+    _exclude_variables = ['dummy']
 
 
     def _check_name(self, name):
@@ -55,7 +55,11 @@ class Pruner(object):
     def _update_mask(self, value, existing_mask, params):
         # dns style update
         alpha = params.get('alpha')
+        if value.is_cuda:
+            value = value.cpu()
         value = value.detach().numpy()
+        if existing_mask.is_cuda:
+            existing_mask = existing_mask.cpu()
         existing_mask = existing_mask.detach().numpy()
         # threshold = np.percentile(value, alpha*100)
         # mask = torch.Tensor((value > threshold).astype(np.float))
