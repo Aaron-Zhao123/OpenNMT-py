@@ -46,6 +46,7 @@ class Quantizer(object):
         self.gmm_stats = {}
         self.masks = {}
         self.quan = {}
+        self.interval_mask = {}
         self.epsilon = epsolon
         self.trainable_scale = Parameter(torch.Tensor([1.0]), requires_grad=True)
         super(Quantizer).__init__()
@@ -74,7 +75,7 @@ class Quantizer(object):
                 # quantized = nzmask * self.shift_quantize(value, width=width, bias=bias)
                 quantized = self.shift_quantize(value, width=width, bias=bias)
             quantized *= self.trainable_scale
-            quantized = quantized * self.interval_mask + value * (1 - self.interval_mask)
+            quantized = quantized * self.interval_mask[name] + value * (1 - self.interval_mask[name])
             return quantized
         return value
 
@@ -127,19 +128,15 @@ class Quantizer(object):
                     value = value * pmask - pmean + value * nmask - nmean
                     value *= nzmask
                 threshold = np.percentile(np.abs(value[nzmask]), self.percentage * 100)
-                self.interval_mask = np.abs(value) > threshold
-                self.interval_mask = torch.Tensor(self.interval_mask.astype(np.int))
+                self.interval_mask[n] = np.abs(value) > threshold
+                self.interval_mask[n] = torch.Tensor(self.interval_mask[n].astype(np.int))
 
                 bias = self._shift_update(value, width)
                 self.gmm_stats[n] = (pmean, pstd, nmean, nstd)
                 self.masks[n] = (pmask, nmask, zmask, nzmask)
                 self.quan[n] = (mode, width, bias)
-<<<<<<< HEAD
-        self._save_meta(self.save_meta)
-=======
                 names.append(n)
         print('[QUANTIZE!] {} are quantized with {} bitwidth using MLE'.format(names, self.width))
->>>>>>> refs/remotes/origin/master
 
 
     def _shift_update(self, value, width):
@@ -190,12 +187,12 @@ class Quantizer(object):
 
     def _load_meta(self, fname):
         with open(fname, 'rb') as f:
-            self.gmm_stats, self.masks, self.quan  = pickle.load(f)
+            self.gmm_stats, self.masks, self.quan, self.interval_mask  = pickle.load(f)
         print("Loaded mask from {}".format(fname))
 
     def _save_meta(self, fname):
         with open(fname, 'wb') as f:
-            pickle.dump((self.gmm_stats, self.masks, self.quan), f)
+            pickle.dump((self.gmm_stats, self.masks, self.quan, self.interval_mask), f)
 
 
 class BimodalGaussian(GaussianMixture):
