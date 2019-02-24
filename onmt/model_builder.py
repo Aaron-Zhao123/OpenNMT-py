@@ -19,6 +19,7 @@ from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
 from overriders.pruner import Pruner
+from overriders.quantizer import Quantizer
 
 
 def build_embeddings(opt, text_field, for_encoder=True):
@@ -162,6 +163,15 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
             load_mask=model_opt.load_mask,
             prune_params=prune_params)
         transformer['pruner'] = pruner
+
+        if model_opt.quantize;
+            quantizer = Quantizer(
+                quantize_params={
+                    'width': model_opt.quantize_width,
+                    'distance': model_opt.quantize_distance,
+                    'percentage': model_opt.quantize_interval}
+            )
+            transformer['quantizer'] = quantizer
         model = onmt.models.NetworkWrapper(
             encoder, decoder, transformer=transformer)
     else:

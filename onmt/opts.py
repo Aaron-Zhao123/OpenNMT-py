@@ -191,6 +191,21 @@ def model_opts(parser):
         '--load_mask', '-load_mask', type=str, default=None,
         help='mask loading path.')
 
+    group.add(
+        '--quantize', '-quantize', type=int, default=0,
+        help='Determines whether to apply a quantizer.')
+    group.add(
+        '--quantize_width', '-quantize_width', type=int, default=4,
+        help='Quantization width.')
+    group.add(
+        '--quantize_distance', '-quantize_distance', type=float, default=2.5,
+        help='W distance.')
+    group.add(
+        '--quantize_interval', '-quantize_interval', type=float, default=0.25,
+        help='Incremetnal quantization interval.')
+
+
+
 def preprocess_opts(parser):
     """ Pre-procesing options """
     # Data options

@@ -30,7 +30,7 @@ class Quantizer(object):
 
     def __init__(
             self, load_meta=None, device='cpu', save_meta='quantize.pkl', epsolon=1e-4,
-            quantize_params={'width': 4, 'distance': 2.5}):
+            quantize_params={'width': 4, 'distance': 2.5, 'percentage': 0.25}):
         if load_meta is not None:
             self._load_meta(load_mask)
         self.quantize = quantize_params
@@ -38,6 +38,7 @@ class Quantizer(object):
         self.device = device
         self.wsep = quantize_params['distance']
         self.width = quantize_params['width']
+        self.percentage = quantize_params['percentage']
         self.gmm_stats = {}
         self.masks = {}
         self.quan = {}
@@ -64,12 +65,12 @@ class Quantizer(object):
                 nvalue = nmask * (value - nmean)
                 residual_quantized = nzmask * self.shift_quantize(pvalue+nvalue, width=width, bias=bias)
                 quantized = (pmean + residual_quantized) * pmask + (nmean + residual_quantized) * nmask
-                import pdb; pdb.set_trace()
             else:
                 # nzmask = torch.Tensor(nzmask.astype(np.int))
                 # quantized = nzmask * self.shift_quantize(value, width=width, bias=bias)
                 quantized = self.shift_quantize(value, width=width, bias=bias)
             quantized *= self.trainable_scale
+            quantized = quantized * self.interval_mask + value * (1 - self.interval_mask)
             return quantized
         return value
 
@@ -115,8 +116,11 @@ class Quantizer(object):
                     nmean = self.shift_quantize(nmean, 2*width, width, bypass_clip=True)
                     value = value * pmask - pmean + value * nmask - nmean
                     value *= nzmask
+                threshold = np.percentile(np.abs(value[nzmask]), self.percentage * 100)
+                self.interval_mask = np.abs(value) > threshold
+                self.interval_mask = torch.Tensor(self.interval_mask.astype(np.int))
+
                 bias = self._shift_update(value, width)
-                import pdb; pdb.set_trace()
                 self.gmm_stats[n] = (pmean, pstd, nmean, nstd)
                 self.masks[n] = (pmask, nmask, zmask, nzmask)
                 self.quan[n] = (mode, width, bias)
