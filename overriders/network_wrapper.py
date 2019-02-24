@@ -19,6 +19,7 @@ def rsetattr(obj, attr, val):
 class NetworkWrapperBase(object):
 
     _variables = ['rnn.weight', 'rnn.layer']
+    _variables = ['weight']
     _exclude_variables = ['embedding']
 
     def _check_name(self, name):
@@ -28,19 +29,36 @@ class NetworkWrapperBase(object):
                     return True
         return False
 
-    def _override(self, update=False):
+    def _override(self, update=False, test=True):
         pruner = self.transformer.get('pruner', None)
         quantizer = self.transformer.get('quantizer', None)
 
+        if test:
+            self.originals = {}
+            self.overriden = {}
+
         if update:
-          pruner.update_masks(self.named_parameters())
+            if pruner is not None:
+                pruner.update_masks(self.named_parameters())
+            if quantizer is not None:
+                quantizer.update_quantizers(self.named_parameters(), pruner.masks)
 
         # pruner
         for name, param in self.named_parameters():
-            if self._check_name(name) and param.data.is_cuda:
-              mask = pruner.get_mask(param.data, name)
-              mask = mask.to(param.data.device)
-              rsetattr(self, name + '.data', param.data.mul_(mask))
+            if test:
+                self.originals[name] = param.data
+            value = param.data
+            if pruner is not None and pruner._check_name(name):
+                mask = pruner.get_mask(value, name)
+                mask = mask.to(param.data.device)
+                value = param.data.mul_(mask)
+            if quantizer is not None and quantizer._check_name(name):
+                value = quantizer.forward_pass(name, value)
+            value = value.to(param.data.device)
+            rsetattr(self, name + '.data', value)
+            if test:
+                self.overriden[name] = value
+
 
 # def override(model, transformer, update=False):
 #     if update:

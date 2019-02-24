@@ -1,15 +1,26 @@
 import numpy as np
 import torch
 import pickle
+import math
 
 from torch.nn import Parameter
 from sklearn.mixture import GaussianMixture
 
 
+class CustomRound(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        return torch.round(x)
+
+    @staticmethod
+    def backward(ctx, g):
+        return g
+
+
 class Quantizer(object):
     # the quantizer is our customized recentralization quantizer
     masks = {}
-    _variables = ['weight', 'bias']
+    _variables = ['weight']
 
     def _check_name(self, name):
         for v_partial in self._variables:
@@ -17,68 +28,107 @@ class Quantizer(object):
                 return True
         return False
 
-    def __init__(self, load_meta=None, device='cpu', save_meta='quantize.pkl', quantize_params={'width': 4, 'distance': 2.0}):
-        if load_mask is not None:
+    def __init__(
+            self, load_meta=None, device='cpu', save_meta='quantize.pkl', epsolon=1e-4,
+            quantize_params={'width': 4, 'distance': 2.5}):
+        if load_meta is not None:
             self._load_meta(load_mask)
-        self.prune_params = prune_params
-        self.save_mask = save_mask
+        self.quantize = quantize_params
+        self.save_meta = save_meta
         self.device = device
-        super(Pruner).__init__()
+        self.wsep = quantize_params['distance']
+        self.width = quantize_params['width']
+        self.gmm_stats = {}
+        self.masks = {}
+        self.quan = {}
+        self.epsilon = epsolon
+        self.trainable_scale = Parameter(torch.Tensor(1.0), requires_grad=True)
+        super(Quantizer).__init__()
 
-    def forward_pass_quantizer(self, name, value):
+    def forward_pass(self, name, value):
         if self._check_name(name):
+            # value = self.shift_quantize(value, self.width, bias=10)
+            # return value
+            # # return value
             nonzeros = value != 0
             mode, width, bias = self.quan[name]
-            pmean, pstd, nmean, nstd = self.stats[name]
+            pmean, pstd, nmean, nstd = self.gmm_stats[name]
             pmask, nmask, zmask, nzmask = self.masks[name]
 
             if mode == 'seperate':
-                pvalue = pmask * ((value - pmean) / (pstd + self.epsilon))
-                nvalue = nmask * ((value - nmean) / (nstd + self.epsilon))
-                quantized = zmask * self.shift_quantize(pvalue-nvalue, width=width, bias=bias)
-                pmean_quantized = self.shift_quantize(pmean, width, bias, bypass_clip=True)
-                nmean_quantized = self.shift_quantize(nmean, width, bias, bypass_clip=True)
-                quantized = (pmean_quantized + quantized) * pmask + (nmean_quantized + quantized) * nmask
+                pmask = torch.Tensor(pmask.astype(np.int))
+                nmask = torch.Tensor(nmask.astype(np.int))
+                nzmask = torch.Tensor(nzmask.astype(np.int))
+
+                pvalue = pmask * (value - pmean)
+                nvalue = nmask * (value - nmean)
+                residual_quantized = nzmask * self.shift_quantize(pvalue+nvalue, width=width, bias=bias)
+                quantized = (pmean + residual_quantized) * pmask + (nmean + residual_quantized) * nmask
+                import pdb; pdb.set_trace()
             else:
-                quantized = nzmask * self.shift_quantize(value, width=width, bias=bias)
-        return quantized
+                # nzmask = torch.Tensor(nzmask.astype(np.int))
+                # quantized = nzmask * self.shift_quantize(value, width=width, bias=bias)
+                quantized = self.shift_quantize(value, width=width, bias=bias)
+            quantized *= self.trainable_scale
+            return quantized
+        return value
 
     def shift_quantize(self, value, width, bias, bypass_clip=False):
         descriminator = (2.0 ** (-bias)) / 2.0
-        sign = value > descriminator
-        sign -= (value < -descriminator)
-
-        value = torch.abs(value)
-        exponent = torch.round(torch.log(value,2))
+        orig_value = value
+        if isinstance(value, torch.Tensor):
+            sign = (orig_value > descriminator).float()
+            sign -= (orig_value < -descriminator).float()
+            abs_orig_value = torch.abs(orig_value)
+            exponent = torch.log2(abs_orig_value)
+            exponent = torch.round(exponent)
+        else:
+            sign = (orig_value > descriminator).astype(np.float)
+            sign -= (orig_value < -descriminator).astype(np.float)
+            exponent = round(math.log(math.fabs(orig_value), 2))
+            return sign * (2.0 ** exponent)
 
         exponent_min = -bias
         exponent_max = 2 ** width - 1 - bias
+
         if not bypass_clip:
-            exponent = torch.clip_by_value(exponent, exponent_min, exponent_max)
+            exponent = torch.clamp(exponent, exponent_min, exponent_max)
+        qvalue = sign.float() * 2.0 ** (exponent)
 
-        return sign * 2.0 ** (exponent)
+        # bypass
+        with torch.no_grad():
+            qerror = orig_value - qvalue
+        return value + qerror
 
-    def update_quantizers(self, named_params):
+    def update_quantizers(self, named_params, pruner_masks=None):
         for n, p in named_params:
             if self._check_name(n):
-                mode, width, pmean, nmean, pstd, nstd, pmask, nmask, zmask = self.mle_update(p)
+                if p.is_cuda:
+                    p = p.cpu()
+                p = p.detach().numpy()
+                mask = pruner_masks[n+'.mask'].detach().numpy().astype(np.int)
+                mode, width, pmean, nmean, pstd, nstd, pmask, nmask, zmask = self.mle_update(n, p, mask)
                 nzmask = np.logical_not(nmask)
+                value = p
                 if mode == 'seperate':
+                    pmean = self.shift_quantize(pmean, 2*width, width, bypass_clip=True)
+                    nmean = self.shift_quantize(nmean, 2*width, width, bypass_clip=True)
                     value = value * pmask - pmean + value * nmask - nmean
                     value *= nzmask
                 bias = self._shift_update(value, width)
-                self.stats[name] = (pmean, pstd, nmean, nstd)
-                self.masks[name] = (pmask, nmask, zmask, nzmask)
-                self.quan[name] = (mode, width, bias)
+                import pdb; pdb.set_trace()
+                self.gmm_stats[n] = (pmean, pstd, nmean, nstd)
+                self.masks[n] = (pmask, nmask, zmask, nzmask)
+                self.quan[n] = (mode, width, bias)
 
 
     def _shift_update(self, value, width):
         max_exponent = np.ceil(np.log2(np.max(np.abs(value))))
-        return 2 ** width - 1 - max_exponent
+        return 2 ** width - max_exponent
 
-    def mle_update(self, name, value):
-        value = value.detach().numpy()
-        nzmask = value != 0
+    def mle_update(self, name, value, nzmask=None):
+        if nzmask is None:
+            nzmask = value != 0
 
         mixture = BimodalGaussian(name, value[nzmask], 0.0)
         pmean, nmean = mixture.pmean, mixture.nmean

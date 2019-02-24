@@ -10,6 +10,7 @@ class Pruner(object):
     _variables = ['rnn.weight', 'rnn.layer']
     _exclude_variables = ['embedding']
 
+    _variables = ['weight']
 
     def _check_name(self, name):
         for v_partial in self._variables:
