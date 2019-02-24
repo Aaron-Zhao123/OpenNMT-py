@@ -164,7 +164,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
             prune_params=prune_params)
         transformer['pruner'] = pruner
 
-        if model_opt.quantize;
+        if model_opt.quantize:
             quantizer = Quantizer(
                 quantize_params={
                     'width': model_opt.quantize_width,
